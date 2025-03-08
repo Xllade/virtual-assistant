@@ -4,6 +4,8 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 using TMPro;
+using Meta.WitAi;
+using Meta.WitAi.Requests;
 
 namespace VirtualAssistant
 {
@@ -18,7 +20,8 @@ namespace VirtualAssistant
 
         private float _height;
 
-        [SerializeField] private string _prompt = "You are Budi, a young man from Indonesia. Don't break character. Don't ever mention that you are an AI model.";
+        [SerializeField, TextArea] private string _prompt = "You are Budi, a young man from Indonesia. Don't break character. Don't ever mention that you are an AI model.";
+        [SerializeField] private VoiceService _voiceService;
 
         [Header("JSON API Configuration")]
         [SerializeField] private TextAsset _jsonApi;
@@ -31,7 +34,35 @@ namespace VirtualAssistant
             UnityAndGeminiKey jsonApiKey = JsonUtility.FromJson<UnityAndGeminiKey>(_jsonApi.text);
             _apiKey = jsonApiKey.key;   
             _chatHistory = new Content[] { };
-            _button.onClick.AddListener(SendChat);
+        }
+
+        void OnEnable()
+        {
+            _inputField.onEndEdit.AddListener(OnEndEditInputField);
+            _voiceService.VoiceEvents.OnStartListening.AddListener(OnStartListeningVoiceEvent);
+            _voiceService.VoiceEvents.OnComplete.AddListener(OnCompleteVoiceEvent);
+        }
+
+        void OnDisable()
+        {
+            _inputField.onEndEdit.RemoveListener(OnEndEditInputField);
+            _voiceService.VoiceEvents.OnStartListening.RemoveListener(OnStartListeningVoiceEvent);
+            _voiceService.VoiceEvents.OnComplete.RemoveListener(OnCompleteVoiceEvent);
+        }
+
+        private void OnEndEditInputField(string inputString)
+        {
+            if (Input.GetKeyDown(KeyCode.Return)) StartCoroutine(SendChatRequestToGemini(inputString));
+        }
+
+        private void OnStartListeningVoiceEvent()
+        {
+            _inputField.enabled = false;
+        }
+
+        private void OnCompleteVoiceEvent(VoiceServiceRequest request)
+        {
+            StartCoroutine(SendChatRequestToGemini(_inputField.text));
         }
 
         private void AppendMessage(Content content)
@@ -47,14 +78,9 @@ namespace VirtualAssistant
             _scroll.verticalNormalizedPosition = 0;
         }
 
-        public void SendChat()
-        {
-            string userMessage = _inputField.text;
-            StartCoroutine( SendChatRequestToGemini(_inputField.text));
-        }
-
         private IEnumerator SendChatRequestToGemini(string newMessage)
         {
+            if (string.IsNullOrWhiteSpace(newMessage)) yield break;
 
             string url = $"{_apiEndpoint}?key={_apiKey}";
         
@@ -106,7 +132,6 @@ namespace VirtualAssistant
                 }
                 else
                 {
-                    Debug.Log("Request complete!");
                     Response response = JsonUtility.FromJson<Response>(www.downloadHandler.text);
                     if (response.candidates.Length > 0 && response.candidates[0].content.parts.Length > 0)
                     {
