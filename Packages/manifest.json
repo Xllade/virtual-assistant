@@ -1,8 +1,10 @@
 {
   "dependencies": {
     "com.srcnalt.openai-unity": "https://github.com/srcnalt/OpenAI-Unity.git",
+    "com.unity.cloud.gltfast": "6.0.1",
     "com.unity.collab-proxy": "2.7.1",
     "com.unity.feature.development": "1.0.1",
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
     "com.unity.textmeshpro": "3.0.7",
     "com.unity.timeline": "1.7.6",
     "com.unity.ugui": "1.0.0",
