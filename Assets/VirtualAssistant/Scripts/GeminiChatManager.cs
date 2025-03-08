@@ -6,6 +6,8 @@ using UnityEngine.UI;
 using TMPro;
 using Meta.WitAi;
 using Meta.WitAi.Requests;
+using Meta.WitAi.TTS.Utilities;
+using Meta.WitAi.TTS.Data;
 
 namespace VirtualAssistant
 {
@@ -22,6 +24,7 @@ namespace VirtualAssistant
 
         [SerializeField, TextArea] private string _prompt = "You are Budi, a young man from Indonesia. Don't break character. Don't ever mention that you are an AI model.";
         [SerializeField] private VoiceService _voiceService;
+        [SerializeField] private TTSSpeaker _ttsSpeaker;
 
         [Header("JSON API Configuration")]
         [SerializeField] private TextAsset _jsonApi;
@@ -80,7 +83,12 @@ namespace VirtualAssistant
 
         private IEnumerator SendChatRequestToGemini(string newMessage)
         {
-            if (string.IsNullOrWhiteSpace(newMessage)) yield break;
+            Debug.Log("chat: "+newMessage);
+            if (string.IsNullOrWhiteSpace(newMessage))
+            {
+                EnableUI(true);
+                yield break;
+            }
 
             string url = $"{_apiEndpoint}?key={_apiKey}";
         
@@ -107,9 +115,8 @@ namespace VirtualAssistant
             _chatHistory = contentsList.ToArray();
 
             AppendMessage(userContent);
-            _button.enabled = false;
             _inputField.text = "";
-            _inputField.enabled = false;
+            EnableUI(false);
 
             ChatRequest chatRequest = new ChatRequest { contents = _chatHistory, systemInstruction = systemInstructionContent};
 
@@ -129,36 +136,67 @@ namespace VirtualAssistant
                 if (www.result != UnityWebRequest.Result.Success)
                 {
                     Debug.LogError(www.error);
+                    EnableUI(true);
                 }
                 else
                 {
                     Response response = JsonUtility.FromJson<Response>(www.downloadHandler.text);
                     if (response.candidates.Length > 0 && response.candidates[0].content.parts.Length > 0)
                     {
-                            //This is the response to your request
-                            string reply = response.candidates[0].content.parts[0].text;
-                            Content botContent = new Content
-                            {
-                                role = "model",
-                                parts = new Part[]
-                                {
-                                    new Part { text = reply }
-                                }
-                            };
-                            //This part adds the response to the chat history, for your next message
-                            contentsList.Add(botContent);
-                            _chatHistory = contentsList.ToArray();
-
-                            AppendMessage(botContent);
+                        var message = response.candidates[0].content.parts[0].text;
+                        var tTSSpeakerClipEvents = new TTSSpeakerClipEvents();
+                        void OnLoadAbortTTS(TTSSpeaker tTSSpeaker, TTSClipData tTSClipData)
+                        {
+                            AddBotMessage(message);
+                            EnableUI(true);
+                        }
+                        void OnLoadFailedTTS(TTSSpeaker tTSSpeaker, TTSClipData tTSClipData, string error)
+                        {
+                            AddBotMessage(message);
+                            EnableUI(true);
+                        }
+                        void OnLoadSuccessTTS(TTSSpeaker tTSSpeaker, TTSClipData tTSClipData)
+                        {
+                            AddBotMessage(message);
+                        }
+                        void OnPlaybackCompleteTTS(TTSSpeaker tTSSpeaker, TTSClipData tTSClipData)
+                        {
+                            EnableUI(true);
+                        }
+                        tTSSpeakerClipEvents.OnLoadAbort.AddListener(OnLoadAbortTTS);
+                        tTSSpeakerClipEvents.OnLoadFailed.AddListener(OnLoadFailedTTS);
+                        tTSSpeakerClipEvents.OnLoadSuccess.AddListener(OnLoadSuccessTTS);
+                        tTSSpeakerClipEvents.OnPlaybackComplete.AddListener(OnPlaybackCompleteTTS);
+                        _ttsSpeaker.Speak(message, tTSSpeakerClipEvents);
                     }
                     else
                     {
                         Debug.Log("No text found.");
+                        EnableUI(true);
                     }
                 }
-                _button.enabled = true;
-                _inputField.enabled = true;
             }  
+        }
+
+        private void AddBotMessage(string message)
+        {
+            Content botContent = new Content
+            {
+                role = "model",
+                parts = new Part[]
+                {
+                    new Part { text = message }
+                }
+            };
+            List<Content> contentsList = new List<Content>(_chatHistory);
+            contentsList.Add(botContent);
+            _chatHistory = contentsList.ToArray();
+            AppendMessage(botContent);
+        }
+
+        private void EnableUI(bool enable)
+        {
+            _button.interactable = _inputField.interactable = enable;
         }
     }
 }
