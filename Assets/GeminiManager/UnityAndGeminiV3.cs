@@ -19,6 +19,7 @@ public class Response
 public class ChatRequest
 {
     public Content[] contents;
+    public Content systemInstruction;
 }
 
 [System.Serializable]

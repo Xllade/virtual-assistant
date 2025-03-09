@@ -25,6 +25,7 @@ namespace VirtualAssistant
         [SerializeField, TextArea] private string _prompt = "You are Budi, a young man from Indonesia. Don't break character. Don't ever mention that you are an AI model.";
         [SerializeField] private VoiceService _voiceService;
         [SerializeField] private TTSSpeaker _ttsSpeaker;
+        [SerializeField] private GameObject _avatar;
 
         [Header("JSON API Configuration")]
         [SerializeField] private TextAsset _jsonApi;
@@ -117,6 +118,7 @@ namespace VirtualAssistant
             AppendMessage(userContent);
             _inputField.text = "";
             EnableUI(false);
+            _avatar.GetComponent<Animator>().SetBool("isListening", true);
 
             ChatRequest chatRequest = new ChatRequest { contents = _chatHistory, systemInstruction = systemInstructionContent};
 
@@ -158,6 +160,10 @@ namespace VirtualAssistant
                         void OnLoadSuccessTTS(TTSSpeaker tTSSpeaker, TTSClipData tTSClipData)
                         {
                             AddBotMessage(message);
+                            _avatar.GetComponent<AudioSource>().clip = tTSClipData.clip;
+                            _avatar.GetComponent<AudioSource>().Play();
+                            _avatar.GetComponent<Animator>().SetBool("isListening", false);
+                            _avatar.GetComponent<Animator>().SetBool("isTalking", true);
                         }
                         void OnPlaybackCompleteTTS(TTSSpeaker tTSSpeaker, TTSClipData tTSClipData)
                         {
@@ -180,6 +186,7 @@ namespace VirtualAssistant
 
         private void AddBotMessage(string message)
         {
+            Debug.Log($"bot: {message}");
             Content botContent = new Content
             {
                 role = "model",
@@ -197,6 +204,11 @@ namespace VirtualAssistant
         private void EnableUI(bool enable)
         {
             _button.interactable = _inputField.interactable = enable;
+            if (enable)
+            {
+                _avatar.GetComponent<Animator>().SetBool("isListening", false);
+                _avatar.GetComponent<Animator>().SetBool("isTalking", false);
+            }
         }
     }
 }
