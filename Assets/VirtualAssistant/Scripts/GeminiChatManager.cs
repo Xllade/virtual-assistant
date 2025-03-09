@@ -22,10 +22,12 @@ namespace VirtualAssistant
 
         private float _height;
 
-        [SerializeField, TextArea] private string _prompt = "You are Budi, a young man from Indonesia. Don't break character. Don't ever mention that you are an AI model.";
+        [SerializeField, TextArea] private string _prompt = "";
         [SerializeField] private VoiceService _voiceService;
         [SerializeField] private TTSSpeaker _ttsSpeaker;
         [SerializeField] private GameObject _avatar;
+        [SerializeField] private PromptMenu _promptMenu;
+        [SerializeField] private TextMeshProUGUI _versionText;
 
         [Header("JSON API Configuration")]
         [SerializeField] private TextAsset _jsonApi;
@@ -38,6 +40,9 @@ namespace VirtualAssistant
             UnityAndGeminiKey jsonApiKey = JsonUtility.FromJson<UnityAndGeminiKey>(_jsonApi.text);
             _apiKey = jsonApiKey.key;   
             _chatHistory = new Content[] { };
+            _promptMenu.SetPromptInputFieldText(_prompt);
+            _promptMenu.gameObject.SetActive(true);
+            _versionText.text = $"Version {Application.version}";
         }
 
         void OnEnable()
@@ -45,6 +50,7 @@ namespace VirtualAssistant
             _inputField.onEndEdit.AddListener(OnEndEditInputField);
             _voiceService.VoiceEvents.OnStartListening.AddListener(OnStartListeningVoiceEvent);
             _voiceService.VoiceEvents.OnComplete.AddListener(OnCompleteVoiceEvent);
+            _promptMenu.OnSetPrompt += OnSetPrompt;
         }
 
         void OnDisable()
@@ -52,6 +58,7 @@ namespace VirtualAssistant
             _inputField.onEndEdit.RemoveListener(OnEndEditInputField);
             _voiceService.VoiceEvents.OnStartListening.RemoveListener(OnStartListeningVoiceEvent);
             _voiceService.VoiceEvents.OnComplete.RemoveListener(OnCompleteVoiceEvent);
+            _promptMenu.OnSetPrompt -= OnSetPrompt;
         }
 
         private void OnEndEditInputField(string inputString)
@@ -61,12 +68,17 @@ namespace VirtualAssistant
 
         private void OnStartListeningVoiceEvent()
         {
-            _inputField.enabled = false;
+            _inputField.interactable = false;
         }
 
         private void OnCompleteVoiceEvent(VoiceServiceRequest request)
         {
             StartCoroutine(SendChatRequestToGemini(_inputField.text));
+        }
+
+        private void OnSetPrompt(string prompt)
+        {
+            _prompt = prompt;
         }
 
         private void AppendMessage(Content content)
